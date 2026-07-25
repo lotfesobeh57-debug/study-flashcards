@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Study Flashcards</title>
+<meta name="description" content="A spaced-repetition flashcard tool for electrical engineering coursework, built with the Leitner system. Single-file JavaScript, no backend, data stored locally.">
+<meta property="og:title" content="Study Flashcards">
+<meta property="og:description" content="A spaced-repetition flashcard tool for electrical engineering coursework, built with the Leitner system.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23eee9dd' stroke='%2393712f' stroke-width='6'/%3E%3Cline x1='50' y1='50' x2='50' y2='16' stroke='%2393712f' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='50' y1='50' x2='74' y2='68' stroke='%23cdbb8d' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%2393712f'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,620&family=Inter:wght@400;500;600&family=Noto+Serif+Arabic:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&family=Noto+Serif+Hebrew:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #eee9dd;
+    --paper-2: #e4ddcc;
+    --ink: #24211b;
+    --ink-dim: #6f6858;
+    --brass: #93712f;
+    --brass-deep: #6e5322;
+    --brass-pale: #cdbb8d;
+    --forest: #3d5a45;
+    --oxblood: #7a3a30;
+    --rule: #d3c8ab;
+    --serif: 'Fraunces', 'Noto Serif Arabic', 'Noto Serif Hebrew', Georgia, serif;
+    --sans: 'Inter', 'Noto Sans Arabic', 'Noto Sans Hebrew', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--paper);
+    background-image: radial-gradient(circle at 50% -10%, rgba(255,255,255,0.5), transparent 60%);
+    color: var(--ink);
+    font-family: var(--sans);
+    display: flex;
+    justify-content: center;
+    padding: 48px 18px;
+  }
+  .scope { width: 100%; max-width: 540px; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 16px;
+    border-bottom: 1.5px solid var(--ink);
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-optical-sizing: auto;
+    font-weight: 560;
+    font-size: 25px;
+    letter-spacing: 0.01em;
+    margin: 0;
+  }
+  .status { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); }
+
+  .about {
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    margin: 0 0 26px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brass-deep);
+    margin: 0 0 14px;
+    font-weight: 600;
+  }
+
+  .banner {
+    font-size: 12.5px;
+    padding: 10px 14px;
+    border: 1px solid var(--oxblood);
+    color: var(--oxblood);
+    border-radius: 2px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .banner.show { display: block; }
+
+  .card-plate {
+    background: #fbf9f3;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    box-shadow: 0 1px 2px rgba(36,33,27,0.04), 0 14px 30px -18px rgba(36,33,27,0.35);
+    padding: 34px 30px;
+    min-height: 168px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 18px;
+    position: relative;
+    transition: box-shadow 0.3s ease;
+  }
+  .card-plate.flash-correct { box-shadow: 0 0 0 2px var(--forest), 0 14px 30px -18px rgba(36,33,27,0.35); }
+  .card-plate.flash-wrong { box-shadow: 0 0 0 2px var(--oxblood), 0 14px 30px -18px rgba(36,33,27,0.35); }
+  .card-plate .front { font-family: var(--serif); font-weight: 440; font-size: 21px; line-height: 1.5; }
+  .card-plate .back {
+    font-family: var(--sans); font-size: 15px; line-height: 1.6; color: var(--forest);
+    border-top: 1px solid var(--rule); padding-top: 16px;
+  }
+  .card-plate .empty { font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--ink-dim); text-align: center; }
+  .card-plate .empty .sub { font-family: var(--sans); font-style: normal; font-size: 12px; margin-top: 8px; color: var(--ink-dim); }
+  .dial-slot { position: absolute; top: 16px; right: 18px; }
+
+  .actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+  .hint { font-size: 11px; color: var(--ink-dim); }
+  button {
+    font-family: var(--sans); font-size: 13px; font-weight: 500; letter-spacing: 0.01em;
+    padding: 12px 20px; border-radius: 2px; border: 1px solid var(--ink);
+    background: transparent; color: var(--ink); cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  button:hover { background: var(--ink); color: var(--paper); }
+  button:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+  button.small { padding: 7px 12px; font-size: 12px; }
+  .btn-primary { border-color: var(--brass-deep); color: var(--brass-deep); }
+  .btn-primary:hover { background: var(--brass-deep); color: var(--paper); }
+  .btn-correct { border-color: var(--forest); color: var(--forest); }
+  .btn-correct:hover { background: var(--forest); color: var(--paper); }
+  .btn-wrong { border-color: var(--oxblood); color: var(--oxblood); }
+  .btn-wrong:hover { background: var(--oxblood); color: var(--paper); }
+  .btn-ghost { border-color: var(--rule); color: var(--ink-dim); }
+
+  nav.tabs { display: flex; gap: 28px; margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  nav.tabs button { border: none; background: none; padding: 4px 0; font-size: 13px; letter-spacing: 0.03em; color: var(--ink-dim); border-radius: 0; }
+  nav.tabs button:hover { background: none; color: var(--ink); }
+  nav.tabs button.active { color: var(--ink); box-shadow: inset 0 -2px 0 var(--brass); }
+
+  .panel { padding-top: 26px; }
+  .panel[hidden] { display: none; }
+
+  form { display: flex; flex-direction: column; gap: 12px; }
+  label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+  input, textarea {
+    font-family: var(--sans); font-size: 14px; background: #fbf9f3; border: 1px solid var(--rule);
+    border-radius: 2px; color: var(--ink); padding: 11px 13px; resize: vertical;
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--brass); }
+
+  .divider-label {
+    display: flex; align-items: center; gap: 12px; margin: 26px 0 16px;
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim);
+  }
+  .divider-label::before, .divider-label::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+  .help-text { font-size: 12.5px; color: var(--ink-dim); line-height: 1.6; margin: 0 0 12px; }
+  .help-text code { background: var(--paper-2); padding: 1px 5px; border-radius: 2px; font-size: 11.5px; }
+  .import-result { font-size: 12.5px; color: var(--forest); margin-top: 8px; min-height: 1em; }
+
+  .stats-row { display: flex; gap: 22px; margin-bottom: 18px; }
+  .stat { }
+  .stat .n { font-family: var(--serif); font-size: 22px; font-weight: 560; }
+  .stat .l { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+
+  .card-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--rule); }
+  .card-row:last-child { border-bottom: none; }
+  .card-row .front { font-size: 13.5px; }
+  .card-row .meta { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+  .row-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .icon-btn {
+    border: 1px solid var(--rule); background: none; color: var(--ink-dim);
+    width: 26px; height: 26px; padding: 0; font-size: 13px; border-radius: 2px; line-height: 1;
+  }
+  .icon-btn:hover { background: var(--paper-2); color: var(--ink); }
+  .icon-btn.danger:hover { background: var(--oxblood); color: var(--paper); border-color: var(--oxblood); }
+  .all-empty { font-size: 13px; color: var(--ink-dim); font-style: italic; }
+  .export-row { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rule); flex-wrap: wrap; align-items: center; }
+  .seed-tag {
+    font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brass-deep);
+    border: 1px solid var(--brass-pale); border-radius: 2px; padding: 1px 5px; margin-left: 6px;
+  }
+
+  .modal-scrim {
+    position: fixed; inset: 0; background: rgba(36,33,27,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 20; padding: 20px;
+  }
+  .modal-scrim[hidden] { display: none; }
+  .modal {
+    background: #fbf9f3; border: 1px solid var(--rule); border-radius: 3px;
+    box-shadow: 0 20px 50px -20px rgba(36,33,27,0.5); padding: 26px 26px 20px; max-width: 380px; width: 100%;
+  }
+  .modal p { font-size: 14px; line-height: 1.55; margin: 0 0 18px; }
+  .modal .actions { margin-top: 0; }
+
+  .icon-btn svg { display: block; }
+</style>
+</head>
+<body>
+<div class="scope">
+  <header>
+    <h1>Study Flashcards</h1>
+    <span class="status" id="status-text" aria-live="polite">0 due</span>
+  </header>
+  <p class="about">A personal spaced-repetition tool for electrical engineering coursework, built on the Leitner system. Pre-loaded with a few sample cards — add your own any time.</p>
+  <p class="banner" id="storage-banner">Your browser blocked local storage, so new cards won't be saved after you close this tab (this often happens in private/incognito mode).</p>
+
+  <main>
+    <section id="review-panel" class="panel">
+      <p class="eyebrow">Review</p>
+      <div class="card-plate" id="review-screen" aria-live="polite"></div>
+      <div class="actions" id="review-actions"></div>
+    </section>
+
+    <section id="add-panel" class="panel" hidden>
+      <p class="eyebrow" id="add-eyebrow">Add a card</p>
+      <form id="add-form">
+        <label for="front-input">Front</label>
+        <textarea id="front-input" rows="2" required dir="auto"></textarea>
+        <label for="back-input">Back</label>
+        <textarea id="back-input" rows="2" required dir="auto"></textarea>
+        <div class="actions">
+          <button type="submit" class="btn-primary" id="add-submit-btn">Add card</button>
+          <button type="button" class="btn-ghost small" id="cancel-edit-btn" hidden>Cancel edit</button>
+        </div>
+      </form>
+
+      <div class="divider-label">or add several at once</div>
+      <p class="help-text">
+        This site can't generate questions on its own — that would mean exposing an API key to
+        every visitor. Instead: ask Claude to write a set of Q&amp;A pairs for your topic in this
+        format, then paste the result below.<br>
+        <code>Q: question&#10;A: answer</code> — one blank line between cards.
+      </p>
+      <form id="import-form">
+        <textarea id="import-input" rows="5" placeholder="Q: What is Ohm's law?&#10;A: V = IR&#10;&#10;Q: ..." dir="auto"></textarea>
+        <button type="submit">Import cards</button>
+      </form>
+      <p class="import-result" id="import-result"></p>
+    </section>
+
+    <section id="all-panel" class="panel" hidden>
+      <p class="eyebrow">All cards</p>
+      <div class="stats-row" id="stats-row"></div>
+      <div id="all-list"></div>
+      <div class="export-row">
+        <button class="small" id="export-btn">Export backup (.json)</button>
+        <button class="small" id="import-json-btn">Restore from backup</button>
+        <button class="small btn-ghost" id="clear-samples-btn">Clear sample cards</button>
+        <input type="file" id="import-json-file" accept="application/json" hidden>
+      </div>
+    </section>
+
+    <nav class="tabs">
+      <button data-tab="review" class="active">Review</button>
+      <button data-tab="add">Add card</button>
+      <button data-tab="all">All cards</button>
+    </nav>
+  </main>
+</div>
+
+<div class="modal-scrim" id="modal-scrim" hidden role="alertdialog" aria-modal="true">
+  <div class="modal">
+    <p id="modal-message"></p>
+    <div class="actions">
+      <button class="btn-wrong" id="modal-confirm">Confirm</button>
+      <button class="btn-ghost" id="modal-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MAX_BOX = 5;
+const BOX_INTERVALS = {1: 1, 2: 2, 3: 4, 4: 7, 5: 14};
+const STORAGE_KEY = 'ee-flashcards-deck';
+const SEEDED_KEY = 'ee-flashcards-seeded';
+const SCHEMA_VERSION = 1;
+const DIAL_ANGLES = [-135, -67.5, 0, 67.5, 135];
+
+const SEED_CARDS = [
+  { front: 'What does an ideal op-amp assume about its two inputs under negative feedback?', back: 'A "virtual short": both inputs sit at the same voltage, even though no current flows into either one.' },
+  { front: 'What does CMRR measure in a differential amplifier?', back: 'Common-Mode Rejection Ratio — how well the amp rejects signals common to both inputs rather than amplifying only their difference.' },
+  { front: 'Thevenin vs. Norton equivalent — what\u2019s the relationship?', back: 'Same network, two views: Thevenin is a voltage source with series resistance; Norton is a current source with parallel resistance. They convert directly into each other.' },
+  { front: 'On a Bode plot, what does a \u221220 dB/decade slope indicate?', back: 'A single pole in the transfer function — magnitude drops 20 dB for every 10\u00d7 increase in frequency.' },
+  { front: 'What does a pole in the right half of the s-plane mean for stability?', back: 'The system is unstable \u2014 its response grows without bound over time.' },
+];
+
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function addDays(isoDate, days) {
+  const d = new Date(isoDate + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function makeCard(front, back, isSeed) {
+  const card = { front, back, box: 1, nextReview: todayISO() };
+  if (isSeed) card.isSeed = true;
+  return card;
+}
+
+function updateCardAfterReview(card, wasCorrect) {
+  if (wasCorrect) {
+    card.box = Math.min(card.box + 1, MAX_BOX);
+  } else {
+    card.box = 1;
+  }
+  card.nextReview = addDays(todayISO(), BOX_INTERVALS[card.box]);
+}
+
+function isDue(card) { return card.nextReview <= todayISO(); }
+
+let storageOK = true;
+function loadDeck() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : (parsed.cards || []);
+    }
+    if (!localStorage.getItem(SEEDED_KEY)) {
+      localStorage.setItem(SEEDED_KEY, '1');
+      const seeded = SEED_CARDS.map(c => makeCard(c.front, c.back, true));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, cards: seeded }));
+      return seeded;
+    }
+    return [];
+  } catch (e) {
+    storageOK = false;
+    return SEED_CARDS.map(c => makeCard(c.front, c.back, true));
+  }
+}
+function saveDeck() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, cards: deck }));
+  } catch (e) {
+    storageOK = false;
+  }
+  if (!storageOK) document.getElementById('storage-banner').classList.add('show');
+}
+
+const SESSION_KEY = 'ee-flashcards-session';
+function loadSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : { total: 0, correct: 0 };
+  } catch (e) {
+    return { total: 0, correct: 0 };
+  }
+}
+function saveSession() {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ total: sessionTotal, correct: sessionCorrect })); }
+  catch (e) { /* non-fatal: session summary just won't survive a reload */ }
+}
+
+let deck = loadDeck();
+let queue = [];
+let current = null;
+let revealed = false;
+let editingIndex = null;
+const _session = loadSession();
+let sessionTotal = _session.total;
+let sessionCorrect = _session.correct;
+
+function refreshQueue() {
+  queue = deck.filter(isDue);
+  current = queue[0] || null;
+  revealed = false;
+}
+
+function renderStatus() { document.getElementById('status-text').textContent = `${queue.length} due`; }
+
+function polar(cx, cy, r, angleDeg) {
+  const rad = angleDeg * Math.PI / 180;
+  return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) };
+}
+function renderDial(box, size) {
+  const cx = size / 2, cy = size / 2;
+  const outerR = size / 2 - size * 0.06;
+  const innerR = outerR - size * 0.15;
+  const ticks = DIAL_ANGLES.map((a, i) => {
+    const p1 = polar(cx, cy, innerR, a);
+    const p2 = polar(cx, cy, outerR, a);
+    const lit = (i + 1) <= box;
+    return `<line x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" stroke="${lit ? 'var(--brass)' : 'var(--rule)'}" stroke-width="${(size * 0.09).toFixed(1)}" stroke-linecap="round"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-label="box ${box} of ${MAX_BOX}">
+    <circle cx="${cx}" cy="${cy}" r="${(outerR + size * 0.05).toFixed(1)}" fill="none" stroke="var(--rule)" stroke-width="1"/>
+    ${ticks}
+    <circle cx="${cx}" cy="${cy}" r="${(size * 0.05).toFixed(1)}" fill="var(--brass)"/>
+  </svg>`;
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function renderReview() {
+  const screen = document.getElementById('review-screen');
+  const actions = document.getElementById('review-actions');
+  screen.classList.remove('flash-correct', 'flash-wrong');
+
+  if (!current) {
+    const sub = sessionTotal > 0 ? `<div class="sub">Reviewed ${sessionTotal} card${sessionTotal === 1 ? '' : 's'} — ${sessionCorrect} correct.</div>` : '';
+    screen.innerHTML = `<p class="empty">${deck.length === 0 ? 'No cards yet — add your first one below.' : 'All caught up — nothing due right now.'}${sub}</p>`;
+    actions.innerHTML = '';
+    renderStatus();
+    return;
+  }
+
+  screen.innerHTML = `
+    <div class="dial-slot">${renderDial(current.box, 40)}</div>
+    <div class="front" dir="auto">${escapeHtml(current.front)}</div>
+    ${revealed ? `<div class="back" dir="auto">${escapeHtml(current.back)}</div>` : ''}
+  `;
+
+  if (!revealed) {
+    actions.innerHTML = `<button class="btn-primary" id="reveal-btn">Reveal answer</button><span class="hint">space</span>`;
+    document.getElementById('reveal-btn').onclick = () => { revealed = true; renderReview(); };
+  } else {
+    actions.innerHTML = `
+      <button class="btn-correct" id="correct-btn">I knew it</button><span class="hint">\u2192</span>
+      <button class="btn-wrong" id="wrong-btn">I missed it</button><span class="hint">\u2190</span>
+    `;
+    document.getElementById('correct-btn').onclick = () => reviewAnswer(true);
+    document.getElementById('wrong-btn').onclick = () => reviewAnswer(false);
+  }
+  renderStatus();
+}
+
+function reviewAnswer(wasCorrect) {
+  const screen = document.getElementById('review-screen');
+  screen.classList.add(wasCorrect ? 'flash-correct' : 'flash-wrong');
+  updateCardAfterReview(current, wasCorrect);
+  sessionTotal += 1;
+  if (wasCorrect) sessionCorrect += 1;
+  saveSession();
+  saveDeck();
+  refreshQueue();
+  renderReview();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('review-panel').hidden) return;
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (!current) return;
+  if (!revealed && e.code === 'Space') { e.preventDefault(); revealed = true; renderReview(); }
+  else if (revealed && e.key === 'ArrowRight') { reviewAnswer(true); }
+  else if (revealed && e.key === 'ArrowLeft') { reviewAnswer(false); }
+});
+
+function renderStats() {
+  const row = document.getElementById('stats-row');
+  const total = deck.length;
+  const mastered = deck.filter(c => c.box === MAX_BOX).length;
+  const dueNow = deck.filter(isDue).length;
+  row.innerHTML = `
+    <div class="stat"><div class="n">${total}</div><div class="l">Total cards</div></div>
+    <div class="stat"><div class="n">${mastered}</div><div class="l">Mastered</div></div>
+    <div class="stat"><div class="n">${dueNow}</div><div class="l">Due now</div></div>
+  `;
+}
+
+const ICON_EDIT = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const ICON_DELETE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+function renderAll() {
+  renderStats();
+  const list = document.getElementById('all-list');
+  if (deck.length === 0) {
+    list.innerHTML = `<p class="all-empty">No cards yet.</p>`;
+    return;
+  }
+  list.innerHTML = deck.map((c, i) => `
+    <div class="card-row">
+      <div>
+        <div class="front" dir="auto">${escapeHtml(c.front)}${c.isSeed ? '<span class="seed-tag">sample</span>' : ''}</div>
+        <div class="meta">next review ${c.nextReview}</div>
+      </div>
+      <div class="row-actions">
+        ${renderDial(c.box, 30)}
+        <button class="icon-btn" data-edit="${i}" title="Edit" aria-label="Edit card">${ICON_EDIT}</button>
+        <button class="icon-btn danger" data-del="${i}" title="Delete" aria-label="Delete card">${ICON_DELETE}</button>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => startEdit(parseInt(b.dataset.edit)));
+  list.querySelectorAll('[data-del]').forEach(b => b.onclick = () => deleteCard(parseInt(b.dataset.del)));
+}
+
+function startEdit(i) {
+  editingIndex = i;
+  document.getElementById('front-input').value = deck[i].front;
+  document.getElementById('back-input').value = deck[i].back;
+  document.getElementById('add-eyebrow').textContent = 'Edit card';
+  document.getElementById('add-submit-btn').textContent = 'Save changes';
+  document.getElementById('cancel-edit-btn').hidden = false;
+  switchTab('add');
+}
+
+function cancelEdit() {
+  editingIndex = null;
+  document.getElementById('add-form').reset();
+  document.getElementById('add-eyebrow').textContent = 'Add a card';
+  document.getElementById('add-submit-btn').textContent = 'Add card';
+  document.getElementById('cancel-edit-btn').hidden = true;
+}
+
+function confirmModal(message) {
+  return new Promise((resolve) => {
+    const scrim = document.getElementById('modal-scrim');
+    document.getElementById('modal-message').textContent = message;
+    scrim.hidden = false;
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn = document.getElementById('modal-cancel');
+    confirmBtn.focus();
+    function cleanup() {
+      scrim.hidden = true;
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+    }
+    function onConfirm() { cleanup(); resolve(true); }
+    function onCancel() { cleanup(); resolve(false); }
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+async function deleteCard(i) {
+  const ok = await confirmModal(`Delete "${deck[i].front.slice(0, 60)}"? This can't be undone.`);
+  if (!ok) return;
+  deck.splice(i, 1);
+  saveDeck();
+  refreshQueue();
+  renderAll();
+}
+
+document.getElementById('cancel-edit-btn').addEventListener('click', cancelEdit);
+
+document.getElementById('add-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const front = document.getElementById('front-input').value.trim();
+  const back = document.getElementById('back-input').value.trim();
+  if (!front || !back) return;
+
+  if (editingIndex !== null) {
+    deck[editingIndex].front = front;
+    deck[editingIndex].back = back;
+    cancelEdit();
+  } else {
+    deck.push(makeCard(front, back));
+    document.getElementById('add-form').reset();
+  }
+  saveDeck();
+  refreshQueue();
+  renderAll();
+  switchTab('review');
+});
+
+function parseImportBlock(text) {
+  return text.split(/\n\s*\n/).map(block => {
+    const qMatch = block.match(/Q:\s*([\s\S]*?)(?=\nA:|$)/i);
+    const aMatch = block.match(/A:\s*([\s\S]*)/i);
+    if (!qMatch || !aMatch) return null;
+    const front = qMatch[1].trim();
+    const back = aMatch[1].trim();
+    if (!front || !back) return null;
+    return { front, back };
+  }).filter(Boolean);
+}
+
+document.getElementById('import-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const raw = document.getElementById('import-input').value;
+  const parsed = parseImportBlock(raw);
+  const result = document.getElementById('import-result');
+  if (parsed.length === 0) { result.textContent = 'No valid Q:/A: pairs found.'; return; }
+  parsed.forEach(p => deck.push(makeCard(p.front, p.back)));
+  saveDeck();
+  document.getElementById('import-input').value = '';
+  result.textContent = `Added ${parsed.length} card${parsed.length === 1 ? '' : 's'}.`;
+  refreshQueue();
+  renderAll();
+});
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({ schemaVersion: SCHEMA_VERSION, cards: deck }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `study-flashcards-backup-${todayISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('import-json-btn').addEventListener('click', () => {
+  document.getElementById('import-json-file').click();
+});
+document.getElementById('import-json-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const cards = Array.isArray(parsed) ? parsed : parsed.cards;
+      if (!Array.isArray(cards)) throw new Error('bad shape');
+      const ok = await confirmModal(`Restore this backup? It will replace all ${deck.length} card(s) currently on this device.`);
+      if (!ok) return;
+      deck = cards;
+      saveDeck();
+      refreshQueue();
+      renderAll();
+    } catch (err) {
+      alert('That file does not look like a valid backup.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('clear-samples-btn').addEventListener('click', async () => {
+  const sampleCount = deck.filter(c => c.isSeed).length;
+  if (sampleCount === 0) { alert('No sample cards left to clear.'); return; }
+  const ok = await confirmModal(`Remove ${sampleCount} sample card(s)? Your own cards won't be touched.`);
+  if (!ok) return;
+  deck = deck.filter(c => !c.isSeed);
+  saveDeck();
+  refreshQueue();
+  renderAll();
+});
+
+function switchTab(tab) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('review-panel').hidden = tab !== 'review';
+  document.getElementById('add-panel').hidden = tab !== 'add';
+  document.getElementById('all-panel').hidden = tab !== 'all';
+  if (tab !== 'add' && editingIndex !== null) cancelEdit();
+  if (tab === 'all') renderAll();
+  if (tab === 'review') renderReview();
+}
+document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+refreshQueue();
+renderReview();
+if (!storageOK) document.getElementById('storage-banner').classList.add('show');
+</script>
+</body>
+</html>
